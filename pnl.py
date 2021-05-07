@@ -30,6 +30,7 @@ FIELD_SHORTCUTS = {
     "req": "uri",
     "ref": "referer",
     "cc": "country",
+    "user": "remote_user",
 }
 
 
@@ -211,12 +212,8 @@ def read_logs(paths, filters, out_format, fields):
             try:
                 yield out_format % line
             except KeyError as e:
-                log.warning(e)
+                log.warning(f"{e} not found in log line")
                 continue
-            except ValueError as e:
-                print(f"Line is type {type(line)} and contains:\n{line}")
-                print(f"out format: {out_format}")
-                raise
 
 
 def parse_arguments(cmdline=None):
@@ -225,7 +222,11 @@ def parse_arguments(cmdline=None):
     parser.add_argument(
         "--bots", action="store_true", help="Short for --filter %s" % FILTER_BOTS
     )
-    parser.add_argument("--format", help="Format string to display fields")
+    parser.add_argument(
+        "--format",
+        help="Format string to display fields",
+        default=os.getenv("PNL_FORMAT", DEFAULT_FORMAT),
+    )
     parser.add_argument(
         "--list-fields", action="store_true", help="Display a list of available fields"
     )
@@ -290,7 +291,7 @@ def main():
             try:
                 dt = dateutil.parser.parse(args.date)
             except ValueError:
-                print("could not parse date from {!r}".format(args.date))
+                log.warning("could not parse date from {!r}".format(args.date))
                 sys.exit(1)
             target_date = dt.date()
         paths = get_nginx_logs_for_date(target_date)
@@ -306,14 +307,12 @@ def main():
 
     fields = args.fields.split(",") if args.fields else None
 
-    if args.format:
-        out_format = args.format
-    elif args.ncsa:
+    if args.ncsa:
         out_format = NCSA_FORMAT
     elif fields:
         out_format = None
     else:
-        out_format = DEFAULT_FORMAT
+        out_format = args.format
 
     if not paths:
         paths = [sys.stdin]
@@ -334,4 +333,5 @@ def main():
 
 
 if __name__ == "__main__":
+    logging.basicConfig()
     main()
